@@ -1,0 +1,10 @@
+{
+  "input_dim": 1024,
+  "vocab_size": 392,
+  "d_model": 128,
+  "nhead": 4,
+  "num_layers": 3,
+  "dropout": 0.1,
+  "dim_feedforward": 256,
+  "max_len": 256
+}

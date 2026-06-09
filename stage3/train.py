@@ -16,6 +16,7 @@ from hyperpyyaml import load_hyperpyyaml
 from scipy.stats import pearsonr
 from torch.utils.data import DataLoader
 
+from stage3.artifacts import save_feature_stats, save_model_config
 from stage3.dataset import GOPDataset, collate, compute_feature_stats
 from stage3.model import GOPT
 
@@ -62,6 +63,18 @@ def main(hparams_file: str) -> None:
     mean, std = compute_feature_stats(hparams["train_manifest"])
     input_dim = mean.numel()
     print(f"  feature dim: {input_dim}")
+
+    # Persist exactly what the service needs to mirror this run at inference time.
+    save_feature_stats(hparams["output_folder"], mean, std)
+    save_model_config(
+        hparams["output_folder"],
+        input_dim=input_dim,
+        vocab_size=hparams["vocab_size"],
+        d_model=hparams["d_model"],
+        nhead=hparams["nhead"],
+        num_layers=hparams["num_layers"],
+        dropout=hparams["dropout"],
+    )
 
     model = GOPT(
         input_dim=input_dim,

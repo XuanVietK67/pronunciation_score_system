@@ -1,4 +1,4 @@
-"""FastAPI service: POST /score (Stage 1 + 2 spike)."""
+"""FastAPI service: POST /score (Stage 1 + 2 + trained GOPT head)."""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -6,10 +6,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from . import audio as audio_io
-from . import config, gop
+from . import config
 from .acoustic import Acoustic
-from .g2p import build_maps, g2p, to_token_ids
+from .g2p import build_maps
 from .schema import ScoreResponse
+from .score_pipeline import score_word
+from .scorer import load_scorer
 
 _state: dict = {}
 
@@ -18,17 +20,29 @@ _state: dict = {}
 async def lifespan(_app: FastAPI):
     acoustic = Acoustic()
     exact, norm = build_maps(acoustic.vocab)
-    _state.update(acoustic=acoustic, exact=exact, norm=norm)
+    scorer = None
+    if config.USE_TRAINED_HEAD:
+        scorer = load_scorer()  # fails fast with a clear message if artifacts are missing
+        print(f"Loaded trained GOPT head from {config.ARTIFACTS_DIR}")
+    else:
+        print("USE_TRAINED_HEAD=false — using placeholder GOP->score mapping")
+    _state.update(acoustic=acoustic, exact=exact, norm=norm, scorer=scorer)
     yield
     _state.clear()
 
 
-app = FastAPI(title="Pronunciation Scoring (Stage 1+2 spike)", lifespan=lifespan)
+app = FastAPI(title="Pronunciation Scoring", lifespan=lifespan)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": config.MODEL_ID, "ready": bool(_state)}
+    return {
+        "status": "ok",
+        "model": config.MODEL_ID,
+        "model_version": config.MODEL_VERSION,
+        "trained_head": bool(_state.get("scorer")),
+        "ready": bool(_state),
+    }
 
 
 @app.post("/score", response_model=ScoreResponse)
@@ -41,36 +55,12 @@ async def score(audio: UploadFile = File(...), word: str = Form(...)):
     if q["too_short"]:
         raise HTTPException(422, "audio too short")
 
-    phones = g2p(word)
-    token_ids, unmapped = to_token_ids(phones, _state["exact"], _state["norm"])
-    if not token_ids:
-        raise HTTPException(422, f"no phones produced for '{word}'")
-    if unmapped:
-        raise HTTPException(422, f"unmapped phones for '{word}': {unmapped}")
-
-    acoustic: Acoustic = _state["acoustic"]
-    log_probs = acoustic.log_posteriors(wav)
     try:
-        feats = gop.align_and_score(
-            log_probs, token_ids, acoustic.id2phone, acoustic.blank_id
+        phones, phonemes, overall = score_word(
+            wav, word, _state["acoustic"], _state["exact"], _state["norm"], _state["scorer"]
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-
-    phonemes = []
-    for feat in feats:
-        sc = gop.gop_to_score(feat["gop"])
-        phonemes.append(
-            {
-                "phone": feat["phone"],
-                "score": sc,
-                "label": gop.score_to_label(sc),
-                "gop": round(feat["gop"], 4),
-                "start_sec": feat["start_sec"],
-                "end_sec": feat["end_sec"],
-            }
-        )
-    overall = int(round(sum(p["score"] for p in phonemes) / max(len(phonemes), 1)))
 
     return {
         "word": word,
