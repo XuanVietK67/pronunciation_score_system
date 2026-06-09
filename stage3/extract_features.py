@@ -71,7 +71,7 @@ def process_split(ds_split, split, acoustic, exact, norm, out_dir: Path, limit) 
             stats["skip_audio_error"] += 1
             continue
 
-        log_probs = acoustic.log_posteriors(wav)
+        log_probs, hidden = acoustic.forward_features(wav)
         if len(token_ids) > log_probs.shape[0]:
             stats["skip_too_short"] += 1
             continue
@@ -82,7 +82,10 @@ def process_split(ds_split, split, acoustic, exact, norm, out_dir: Path, limit) 
             stats["skip_merge_mismatch"] += 1
             continue
 
-        features = torch.stack([s[3] for s in spans]).to(torch.float32)  # [L, V]
+        # pool wav2vec2 hidden-state embeddings over each phone's aligned span -> [L, H]
+        features = torch.stack(
+            [hidden[start:end].mean(0) for _, start, end, _ in spans]
+        ).to(torch.float32)
         record = {
             "features": features,
             "phone_ids": torch.tensor(token_ids, dtype=torch.long),  # [L]

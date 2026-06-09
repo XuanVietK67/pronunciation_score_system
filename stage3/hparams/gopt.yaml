@@ -1,0 +1,39 @@
+# GOPT head training config (SpeechBrain).
+seed: 1234
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+
+# Data (produced by stage3/extract_features.py).
+features_dir: features_cache
+train_manifest: !ref <features_dir>/train_manifest.json
+test_manifest: !ref <features_dir>/test_manifest.json
+
+output_folder: results/gopt
+save_folder: !ref <output_folder>/save
+
+# vocab_size (phone-id range) must match the Stage-1 model vocab; input_dim is derived
+# from the English phone subset at runtime (see train.py).
+vocab_size: 392
+
+# Training.
+device: cpu
+batch_size: 32
+lr: 0.001
+number_of_epochs: 30
+imbalance_k: 2.0  # loss weight on rare low-accuracy phones: w = 1 + k*(2 - label)
+
+# GOPT hyperparams (the model is built in train.py with the derived input_dim).
+d_model: 128
+nhead: 4
+num_layers: 3
+dropout: 0.1
+
+opt_class: !name:torch.optim.Adam
+    lr: !ref <lr>
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <number_of_epochs>
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        counter: !ref <epoch_counter>

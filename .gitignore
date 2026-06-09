@@ -6,5 +6,6 @@ venv/
 .env
 models/
 features_cache/
+results/
 *.wav
 !tests/data/*.wav

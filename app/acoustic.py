@@ -25,3 +25,18 @@ class Acoustic:
         )
         logits = self.model(inputs.input_values).logits[0]  # [T, V]
         return logits.log_softmax(-1)
+
+    @torch.no_grad()
+    def forward_features(self, wav_16k: torch.Tensor):
+        """wav -> (log_probs [T, V] for alignment, hidden [T, H] embeddings for features).
+
+        The CTC log-posteriors drive forced alignment; the encoder hidden states are the
+        rich per-frame features the Stage-3 head pools per phone.
+        """
+        inputs = self.processor(
+            wav_16k.numpy(), sampling_rate=config.SAMPLE_RATE, return_tensors="pt"
+        )
+        out = self.model(inputs.input_values, output_hidden_states=True)
+        log_probs = out.logits[0].log_softmax(-1)  # [T, V]
+        hidden = out.hidden_states[-1][0]           # [T, H]
+        return log_probs, hidden
