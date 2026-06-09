@@ -8,7 +8,6 @@ class PhonemeScore(BaseModel):
     phone: str
     score: int
     label: str
-    gop: float
     start_sec: float
     end_sec: float
 

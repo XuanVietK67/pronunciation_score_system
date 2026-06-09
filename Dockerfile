@@ -14,5 +14,11 @@ RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pyt
     && pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+# stage3/model.py defines GOPT (rebuilt at load time); stage3 is otherwise training-only.
+COPY stage3 ./stage3
+# Trained head bundle: model.ckpt + feature_stats.pt + model_config.json (~MBs). The
+# 1 GB wav2vec2 acoustic model is NOT baked in — it downloads/caches at runtime.
+# Generate with `python -m stage3.export_artifacts` before building.
+COPY artifacts ./artifacts
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
