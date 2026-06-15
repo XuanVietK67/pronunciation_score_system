@@ -1,3 +1,15 @@
+---
+title: Pronunciation Scoring
+emoji: 🗣️
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
+<!-- The YAML block above is Hugging Face Space metadata (Docker SDK); app_port matches the uvicorn port. -->
+
 # learning-vocab-pronunciation
 
 Pronunciation-scoring microservice for the learning-vocab platform. **Stage 1 + 2 spike**:
