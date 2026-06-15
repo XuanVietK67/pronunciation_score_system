@@ -107,9 +107,11 @@ def load_16k_mono(file_bytes: bytes) -> torch.Tensor:
 - Averages all channels down to **mono**.
 - Resamples to **16 kHz** (`config.SAMPLE_RATE`), the rate wav2vec2 expects.
 
-> ⚠️ **Known limitation:** libsndfile handles `wav` / `flac` / `ogg` only. Browser
-> `webm`/`opus`/`mp3` recordings must be transcoded upstream (or an ffmpeg decode
-> path added) before hitting this endpoint.
+> **Format support:** libsndfile is the fast path (`wav` / `flac` / `ogg`). Browser
+> recordings (`webm`/`opus`, `mp4`/`m4a`, `mp3`) fall back to an **ffmpeg** decode
+> (`_decode_with_ffmpeg`), which transcodes to 16 kHz mono. Undecodable bytes raise
+> `ValueError` → **422**; a missing ffmpeg binary raises `RuntimeError` → **500**
+> (server misconfiguration, not a bad upload). ffmpeg is installed in the Docker image.
 
 ---
 
